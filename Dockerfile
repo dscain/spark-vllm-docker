@@ -1,5 +1,7 @@
+# syntax=docker/dockerfile:1.6
+
 # =========================================================
-# STAGE 1: Builder (Heavy image with compiler toolchain)
+# STAGE 1: Builder (Builds vLLM from Source)
 # =========================================================
 FROM nvidia/cuda:13.0.2-devel-ubuntu24.04 AS builder
 
@@ -44,14 +46,17 @@ ARG CACHEBUST_DEPS=1
 # Using --mount=type=cache ensures that even if this layer invalidates, 
 # pip reuses previously downloaded wheels.
 
-RUN --mount=type=cache,target=/root/.cache/pip \
+# Set pip cache directory
+ENV PIP_CACHE_DIR=/root/.cache/pip
+
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 
 # You can add termplotlib to the list below if you want to visualize text graphs in vllm bench serve
-RUN --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
     pip install xgrammar triton fastsafetensors 
 
-RUN --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
     pip install flashinfer-python --no-deps --index-url https://flashinfer.ai/whl && \
     pip install flashinfer-cubin --index-url https://flashinfer.ai/whl && \
     pip install flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130 && \
@@ -64,7 +69,7 @@ ARG CACHEBUST_VLLM=1
 
 # 4. Smart Git Clone (Fetch changes instead of full re-clone)
 # We mount a cache at /repo-cache. This directory persists on your host machine.
-RUN --mount=type=cache,target=/repo-cache \
+RUN --mount=type=cache,id=repo-cache,target=/repo-cache \
     # 1. Go into the persistent cache directory
     cd /repo-cache && \
     # 2. Logic: Clone if missing, otherwise Fetch & Reset
@@ -85,7 +90,7 @@ RUN --mount=type=cache,target=/repo-cache \
 WORKDIR $VLLM_BASE_DIR/vllm
 
 # Prepare build requirements
-RUN --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
     python3 use_existing_torch.py && \
     sed -i "/flashinfer/d" requirements/cuda.txt && \
     pip install -r requirements/build.txt
@@ -98,13 +103,13 @@ RUN patch -p1 < fastsafetensors.patch
 # Final Compilation
 # We mount the ccache directory here. Ideally, map this to a host volume for persistence 
 # across totally separate `docker build` invocations.
-RUN --mount=type=cache,target=/root/.ccache \
-    --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
     pip install --no-build-isolation . -v
 
 
 # =========================================================
-# STAGE 2: Runner (Lightweight Runtime Image)
+# STAGE 2: Runner (Transfers only necessary artifacts)
 # =========================================================
 FROM nvidia/cuda:13.0.2-devel-ubuntu24.04 AS runner
 
