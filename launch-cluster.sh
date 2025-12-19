@@ -3,12 +3,12 @@
 # Default Configuration
 IMAGE_NAME="vllm-node"
 DEFAULT_CONTAINER_NAME="vllm_node"
-# Modify these if you want to pass additional docker args or set VLLMSPARK_EXTRA_DOCKER_ARGS variable
+# Modify these if you want to pass additional docker args or set VLLM_SPARK_EXTRA_DOCKER_ARGS variable
 DOCKER_ARGS="-e NCCL_DEBUG=INFO -e NCCL_IGNORE_CPU_AFFINITY=1 -v $HOME/.cache/huggingface:/root/.cache/huggingface"
 
 # Append additional arguments from environment variable
-if [[ -n "$VLLMSPARK_EXTRA_DOCKER_ARGS" ]]; then
-    DOCKER_ARGS="$DOCKER_ARGS $VLLMSPARK_EXTRA_DOCKER_ARGS"
+if [[ -n "$VLLM_SPARK_EXTRA_DOCKER_ARGS" ]]; then
+    DOCKER_ARGS="$DOCKER_ARGS $VLLM_SPARK_EXTRA_DOCKER_ARGS"
 fi
 
 # ETH_IF and IB_IF will be auto-detected if not provided
