@@ -21,6 +21,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Allow pip to install globally on Ubuntu 24.04 without a venv
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
+# Set pip cache directory
+ENV PIP_CACHE_DIR=/root/.cache/pip
+ENV UV_CACHE_DIR=/root/.cache/uv
+ENV UV_SYSTEM_PYTHON=1
+ENV UV_BREAK_SYSTEM_PACKAGES=1
+ENV UV_LINK_MODE=copy
+
 # Set the base directory environment variable
 ENV VLLM_BASE_DIR=/workspace/vllm
 
@@ -33,7 +40,8 @@ RUN apt update && apt upgrade -y \
     python3-dev python3-pip git wget \
     libnccl-dev libnccl2 libibverbs1 libibverbs-dev rdma-core \
     ccache \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install uv
 
 # Configure Ccache for CUDA/C++
 ENV PATH=/usr/lib/ccache:$PATH
@@ -61,25 +69,21 @@ ARG CACHEBUST_DEPS=1
 # Using --mount=type=cache ensures that even if this layer invalidates, 
 # pip reuses previously downloaded wheels.
 
-# Set pip cache directory
-ENV PIP_CACHE_DIR=/root/.cache/pip
-
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 
 # Install additional dependencies
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install xgrammar fastsafetensors
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    uv pip install xgrammar fastsafetensors
 
 ARG FLASHINFER_PRE=""
 
 # Install FlashInfer packages
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install ${FLASHINFER_PRE} flashinfer-python --no-deps --index-url https://flashinfer.ai/whl && \
-    pip install ${FLASHINFER_PRE} flashinfer-cubin --index-url https://flashinfer.ai/whl && \
-    pip install ${FLASHINFER_PRE} flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130 && \
-    pip install apache-tvm-ffi nvidia-cudnn-frontend nvidia-cutlass-dsl nvidia-ml-py tabulate
-
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    uv pip install ${FLASHINFER_PRE} flashinfer-python --no-deps --index-url https://flashinfer.ai/whl && \
+    uv pip install ${FLASHINFER_PRE} flashinfer-cubin --index-url https://flashinfer.ai/whl && \
+    uv pip install ${FLASHINFER_PRE} flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130 && \
+    uv pip install apache-tvm-ffi nvidia-cudnn-frontend nvidia-cutlass-dsl nvidia-ml-py tabulate
 # =========================================================
 # STAGE 2: Triton Builder (Compiles Triton independently)
 # =========================================================
@@ -98,15 +102,16 @@ WORKDIR $VLLM_BASE_DIR/triton
 
 # This only runs if TRITON_REF differs from the last build
 RUN --mount=type=cache,id=ccache,target=/root/.ccache \
-    --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     git fetch origin && \
     git checkout ${TRITON_REF} && \
     git submodule sync && \
     git submodule update --init --recursive && \
-    pip install -r python/requirements.txt && \
+    uv pip install -r python/requirements.txt && \
     mkdir -p /workspace/wheels && \
-    pip wheel --no-build-isolation . --wheel-dir=/workspace/wheels -v && \
-    pip wheel --no-build-isolation  python/triton_kernels --no-deps --wheel-dir=/workspace/wheels
+    rm -rf .git && \
+    uv build --no-build-isolation --out-dir=/workspace/wheels -v .  && \
+    uv build --no-build-isolation --no-index --out-dir=/workspace/wheels python/triton_kernels 
 
 # =========================================================
 # STAGE 3: vLLM Builder (Builds vLLM from Source)
@@ -149,12 +154,12 @@ RUN --mount=type=cache,id=repo-cache,target=/repo-cache \
 WORKDIR $VLLM_BASE_DIR/vllm
 
 # Prepare build requirements
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     python3 use_existing_torch.py && \
     sed -i "/flashinfer/d" requirements/cuda.txt && \
     sed -i '/^triton\b/d' requirements/test.txt && \
     sed -i '/^fastsafetensors\b/d' requirements/test.txt && \
-    pip install -r requirements/build.txt
+    uv pip install -r requirements/build.txt
 
 # Apply Patches
 # TEMPORARY PATCH for fastsafetensors loading in cluster setup - tracking https://github.com/foundation-model-stack/fastsafetensors/issues/36
@@ -165,13 +170,13 @@ RUN patch -p1 < fastsafetensors.patch
 # We mount the ccache directory here. Ideally, map this to a host volume for persistence 
 # across totally separate `docker build` invocations.
 RUN --mount=type=cache,id=ccache,target=/root/.ccache \
-    --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install --no-build-isolation . -v
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    uv pip install --no-build-isolation . -v
 
 # Install custom Triton from triton-builder
 COPY --from=triton-builder /workspace/wheels /workspace/wheels
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install /workspace/wheels/*.whl
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    uv pip install /workspace/wheels/*.whl
 
 # =========================================================
 # STAGE 4: Runner (Transfers only necessary artifacts)
@@ -184,6 +189,10 @@ ENV VLLM_BASE_DIR=/workspace/vllm
 
 # Set pip cache directory
 ENV PIP_CACHE_DIR=/root/.cache/pip
+ENV UV_CACHE_DIR=/root/.cache/uv
+ENV UV_SYSTEM_PYTHON=1
+ENV UV_BREAK_SYSTEM_PACKAGES=1
+ENV UV_LINK_MODE=copy
 
 # Install minimal runtime dependencies (NCCL, Python)
 # Note: "devel" tools like cmake/gcc are NOT installed here to save space
@@ -219,6 +228,5 @@ COPY run-cluster-node.sh $VLLM_BASE_DIR/
 RUN chmod +x $VLLM_BASE_DIR/run-cluster-node.sh
 
 # Final extra deps
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    pip install ray[default]
-
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    uv pip install ray[default]

@@ -257,4 +257,4 @@ if [ "$COPY_TIME" -gt 0 ]; then
 fi
 echo "Total Time:    $(printf '%02d:%02d:%02d' $((TOTAL_TIME/3600)) $((TOTAL_TIME%3600/60)) $((TOTAL_TIME%60)))"
 echo "========================================="
-echo "Done."
+echo "Done building $IMAGE_TAG."

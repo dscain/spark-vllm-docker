@@ -19,6 +19,7 @@ ENV PIP_CACHE_DIR=/root/.cache/pip
 ENV UV_CACHE_DIR=/root/.cache/uv
 ENV UV_SYSTEM_PYTHON=1
 ENV UV_LINK_MODE=copy
+ENV UV_BREAK_SYSTEM_PACKAGES=1
 
 # Install minimal runtime dependencies (NCCL, Python)
 # Note: "devel" tools like cmake/gcc are NOT installed here to save space
@@ -43,7 +44,7 @@ COPY fastsafetensors.patch .
 
 # Install fastsafetensors
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv pip install --system --break-system-packages -U fastsafetensors
+    uv pip install -U fastsafetensors
 
 # --- VLLM SOURCE CACHE BUSTER ---
 # Change THIS argument to force a fresh git clone and rebuild of vLLM
@@ -57,9 +58,9 @@ ARG WHEELS_FROM_GITHUB_RELEASE=0
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     if [ "$WHEELS_FROM_GITHUB_RELEASE" = "1" ]; then \
         export VLLM_VERSION=$(curl -s https://api.github.com/repos/vllm-project/vllm/releases/latest | jq -r .tag_name | sed 's/^v//') && \
-        uv pip install --system --break-system-packages -U https://github.com/vllm-project/vllm/releases/download/v${VLLM_VERSION}/vllm-${VLLM_VERSION}+cu130-cp38-abi3-manylinux_2_35_aarch64.whl --torch-backend=auto; \
+        uv pip install -U https://github.com/vllm-project/vllm/releases/download/v${VLLM_VERSION}/vllm-${VLLM_VERSION}+cu130-cp38-abi3-manylinux_2_35_aarch64.whl --torch-backend=auto; \
     else \
-        uv pip install --system --break-system-packages -U vllm \
+        uv pip install -U vllm \
         --torch-backend=auto \
         --extra-index-url https://wheels.vllm.ai/nightly/cu130; \
     fi
@@ -72,9 +73,9 @@ ARG FLASHINFER_PRE=""
 
 # Install flashinfer helper packages
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv pip install --system --break-system-packages ${FLASHINFER_PRE} flashinfer-python -U --no-deps --index-url https://flashinfer.ai/whl && \
-    uv pip install --system --break-system-packages ${FLASHINFER_PRE} flashinfer-cubin --index-url https://flashinfer.ai/whl && \
-    uv pip install --system --break-system-packages ${FLASHINFER_PRE} flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130
+    uv pip install ${FLASHINFER_PRE} flashinfer-python -U --no-deps --index-url https://flashinfer.ai/whl && \
+    uv pip install ${FLASHINFER_PRE} flashinfer-cubin --index-url https://flashinfer.ai/whl && \
+    uv pip install ${FLASHINFER_PRE} flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130
 
 # Setup Env for Runtime
 ENV TORCH_CUDA_ARCH_LIST=12.1a
@@ -87,5 +88,5 @@ RUN chmod +x $VLLM_BASE_DIR/run-cluster-node.sh
 
 # Final extra deps
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv pip install --system --break-system-packages ray[default]
+    uv pip install ray[default]
 
