@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM nvidia/cuda:13.1.0-devel-ubuntu24.04
+FROM nvcr.io/nvidia/pytorch:26.01-py3
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
@@ -21,16 +21,13 @@ ENV UV_SYSTEM_PYTHON=1
 ENV UV_LINK_MODE=copy
 ENV UV_BREAK_SYSTEM_PACKAGES=1
 
-# Install minimal runtime dependencies (NCCL, Python)
-# Note: "devel" tools like cmake/gcc are NOT installed here to save space
-RUN apt update && apt upgrade -y \
-    && apt install -y --allow-change-held-packages --no-install-recommends \
-    python3 python3-pip python3-dev vim curl git wget jq \
-    libcudnn9-cuda-13 \
-    libnccl-dev libnccl2 libibverbs1 libibverbs-dev rdma-core \
+# Install runtime dependencies
+RUN apt update && \
+    apt install -y --no-install-recommends \
+    curl vim git \
     libxcb1 \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install uv
+    && pip install uv && pip uninstall -y flash-attn 
 
 # Set final working directory
 WORKDIR $VLLM_BASE_DIR
@@ -87,6 +84,7 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
 
 # Setup Env for Runtime
 ENV TORCH_CUDA_ARCH_LIST=12.1a
+ENV FLASHINFER_CUDA_ARCH_LIST="12.1f"
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV TIKTOKEN_ENCODINGS_BASE=$VLLM_BASE_DIR/tiktoken_encodings
 
@@ -96,5 +94,5 @@ RUN chmod +x $VLLM_BASE_DIR/run-cluster-node.sh
 
 # Final extra deps
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv pip install ray[default]
+    uv pip install ray[default] fastsafetensors
 
