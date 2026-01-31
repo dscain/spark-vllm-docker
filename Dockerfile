@@ -38,7 +38,7 @@ RUN apt update && \
     curl vim ninja-build git \
     ccache \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install uv && pip uninstall -y flash-attn
+    && pip install uv && pip uninstall -y flash-attn pytorch-triton triton-kernels
 
 # Configure Ccache for CUDA/C++
 ENV PATH=/usr/lib/ccache:$PATH
@@ -58,50 +58,35 @@ WORKDIR $VLLM_BASE_DIR
 ENV TORCH_CUDA_ARCH_LIST=12.1a
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 
-
-
-# 3. Install Python Dependencies with Cache Mounts
-# Using --mount=type=cache ensures that even if this layer invalidates, 
-# pip reuses previously downloaded wheels.
-
-# # Install additional dependencies
-# RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-#     uv pip install fastsafetensors
-
-
-# # =========================================================
-# # STAGE 2: Triton Builder (Compiles Triton independently)
-# # =========================================================
-# FROM base AS triton-builder
-
-# WORKDIR $VLLM_BASE_DIR
-
-# # Initial Triton repo clone (cached forever)
-# RUN git clone https://github.com/triton-lang/triton.git
-
-# # We expect TRITON_REF to be passed from the command line to break the cache
-# # Set to v3.5.1 tag by default
-# ARG TRITON_REF=v3.6.0
-
-# WORKDIR $VLLM_BASE_DIR/triton
-
-# # This only runs if TRITON_REF differs from the last build
-# RUN --mount=type=cache,id=ccache,target=/root/.ccache \
-#     --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-#     git fetch origin && \
-#     git checkout ${TRITON_REF} && \
-#     git submodule sync && \
-#     git submodule update --init --recursive && \
-#     uv pip install -r python/requirements.txt && \
-#     mkdir -p /workspace/wheels && \
-#     rm -rf .git && \
-#     uv build --no-build-isolation --out-dir=/workspace/wheels -v .  && \
-#     uv build --no-build-isolation --no-index --out-dir=/workspace/wheels python/triton_kernels 
-
 # =========================================================
-# STAGE 3: vLLM Builder (Builds vLLM from Source)
+# STAGE 2: Builder (Builds Triton, Flashinfer and vLLM from Source)
 # =========================================================
 FROM base AS builder
+
+
+# Triton Build
+
+# Initial Triton repo clone (cached forever)
+RUN git clone https://github.com/triton-lang/triton.git
+
+# We expect TRITON_REF to be passed from the command line to break the cache
+# Set to v3.5.1 tag by default
+ARG TRITON_REF=v3.5.1
+
+WORKDIR $VLLM_BASE_DIR/triton
+
+# This only runs if TRITON_REF differs from the last build
+RUN --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    git fetch origin && \
+    git checkout ${TRITON_REF} && \
+    git submodule sync && \
+    git submodule update --init --recursive && \
+    uv pip install -r python/requirements.txt && \
+    mkdir -p /workspace/wheels && \
+    rm -rf .git && \
+    uv build --no-build-isolation --wheel --out-dir=/workspace/wheels -v .  && \
+    uv build --no-build-isolation --wheel --no-index --out-dir=/workspace/wheels python/triton_kernels 
 
 ENV FLASHINFER_CUDA_ARCH_LIST="12.1f"
 WORKDIR $VLLM_BASE_DIR
@@ -209,6 +194,7 @@ ARG PRE_TRANSFORMERS=0
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     python3 use_existing_torch.py && \
     sed -i "/flashinfer/d" requirements/cuda.txt && \
+    sed -i '/^triton\b/d' requirements/test.txt && \
     sed -i '/^fastsafetensors\b/d' requirements/test.txt && \
     if [ "$PRE_TRANSFORMERS" = "1" ]; then \
         sed -i '/^transformers\b/d' requirements/common.txt; \
@@ -255,7 +241,7 @@ RUN apt update && \
     curl vim git \
     libxcb1 \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install uv && pip uninstall -y flash-attn 
+    && pip install uv && pip uninstall -y flash-attn pytorch-triton triton-kernels
 
 # Set final working directory
 WORKDIR $VLLM_BASE_DIR
@@ -294,7 +280,7 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
 # Cleanup
 
 # Remove triton-kernels as they are not compatible with this vLLM version yet
-RUN uv pip uninstall triton-kernels
+# RUN uv pip uninstall triton-kernels
 
 # Keeping it here for reference - this won't work as is without squashing layers
 # RUN uv pip uninstall absl-py apex argon2-cffi \
