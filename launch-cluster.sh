@@ -43,7 +43,7 @@ usage() {
     echo "  -e, --env       Environment variable to pass to container (e.g. -e VAR=val)"
     echo "  --nccl-debug    NCCL debug level (Optional, one of: VERSION, WARN, INFO, TRACE). If no level is provided, defaults to INFO."
     echo "  --apply-mod     Path to directory or zip file containing run.sh to apply before launch (Can be specified multiple times)"
-    echo "  --launch-script Path to bash script to execute in the container (from profiles/ directory or absolute path)"
+    echo "  --launch-script Path to bash script to execute in the container (from examples/ directory or absolute path)"
     echo "  --check-config  Check configuration and auto-detection without launching"
     echo "  --solo          Solo mode: skip autodetection, launch only on current node, do not launch Ray cluster"
     echo "  -d              Daemon mode (only for 'start' action)"
@@ -51,7 +51,7 @@ usage() {
     echo "  command         Command to run (only for 'exec' action)"
     echo ""
     echo "Launch Script Usage:"
-    echo "  $0 --launch-script profiles/my-script.sh   # Script copied to container and executed"
+    echo "  $0 --launch-script examples/my-script.sh   # Script copied to container and executed"
     echo "  $0 --launch-script /path/to/script.sh      # Uses absolute path to script"
     exit 1
 }
@@ -120,18 +120,18 @@ if [[ -n "$LAUNCH_SCRIPT_PATH" ]]; then
     # Check if it's an absolute path or relative path that exists
     if [[ -f "$LAUNCH_SCRIPT_PATH" ]]; then
         LAUNCH_SCRIPT_PATH=$(realpath "$LAUNCH_SCRIPT_PATH")
-    # Check if it's just a filename, look in profiles/ directory
-    elif [[ -f "$SCRIPT_DIR/profiles/$LAUNCH_SCRIPT_PATH" ]]; then
-        LAUNCH_SCRIPT_PATH="$SCRIPT_DIR/profiles/$LAUNCH_SCRIPT_PATH"
+    # Check if it's just a filename, look in examples/ directory
+    elif [[ -f "$SCRIPT_DIR/examples/$LAUNCH_SCRIPT_PATH" ]]; then
+        LAUNCH_SCRIPT_PATH="$SCRIPT_DIR/examples/$LAUNCH_SCRIPT_PATH"
     # Check if it's a name without .sh extension
-    elif [[ -f "$SCRIPT_DIR/profiles/${LAUNCH_SCRIPT_PATH}.sh" ]]; then
-        LAUNCH_SCRIPT_PATH="$SCRIPT_DIR/profiles/${LAUNCH_SCRIPT_PATH}.sh"
+    elif [[ -f "$SCRIPT_DIR/examples/${LAUNCH_SCRIPT_PATH}.sh" ]]; then
+        LAUNCH_SCRIPT_PATH="$SCRIPT_DIR/examples/${LAUNCH_SCRIPT_PATH}.sh"
     else
         echo "Error: Launch script '$LAUNCH_SCRIPT_PATH' not found."
         echo "Searched in:"
         echo "  - $LAUNCH_SCRIPT_PATH"
-        echo "  - $SCRIPT_DIR/profiles/$LAUNCH_SCRIPT_PATH"
-        echo "  - $SCRIPT_DIR/profiles/${LAUNCH_SCRIPT_PATH}.sh"
+        echo "  - $SCRIPT_DIR/examples/$LAUNCH_SCRIPT_PATH"
+        echo "  - $SCRIPT_DIR/examples/${LAUNCH_SCRIPT_PATH}.sh"
         exit 1
     fi
     
@@ -578,17 +578,10 @@ start_cluster() {
         done
     fi
 
-    # Copy launch script if specified
+    # Copy launch script to head node only (workers don't need it - they just run Ray)
     if [[ -n "$LAUNCH_SCRIPT_PATH" ]]; then
-        echo "Copying launch script to cluster nodes..."
-        
-        # Copy to Head
+        echo "Copying launch script to head node..."
         copy_launch_script_to_container "$HEAD_IP" "$CONTAINER_NAME" "true" "$LAUNCH_SCRIPT_PATH"
-        
-        # Copy to Workers
-        for worker in "${PEER_NODES[@]}"; do
-            copy_launch_script_to_container "$worker" "$CONTAINER_NAME" "false" "$LAUNCH_SCRIPT_PATH"
-        done
     fi
 
     if [[ "$SOLO_MODE" == "false" ]]; then

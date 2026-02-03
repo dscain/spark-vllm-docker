@@ -75,6 +75,7 @@ RECIPE VERSION HISTORY:
 RELATED FILES:
     - run-recipe.sh: Bash wrapper that ensures Python deps are installed
     - recipes/*.yaml: Recipe definitions
+    - examples/: Example launch scripts for direct use with launch-cluster.sh
     - launch-cluster.sh: Low-level container orchestration
     - build-and-copy.sh: Docker build and distribution
     - hf-download.sh: HuggingFace model download and sync

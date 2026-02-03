@@ -1,6 +1,8 @@
-# Launch Scripts
+# Example Launch Scripts
 
-This directory contains bash scripts that can be executed in the container using the `--launch-script` option. Launch scripts are simple, executable bash files that run directly inside the container.
+This directory contains example bash scripts that demonstrate how to use the `--launch-script` option directly with `launch-cluster.sh`. 
+
+**Note:** For most use cases, the recipe system (`./run-recipe.sh`) is the recommended approach. These examples are provided for reference and for advanced users who need direct control over the launch process.
 
 ## Why Launch Scripts?
 
@@ -12,7 +14,7 @@ This directory contains bash scripts that can be executed in the container using
 ## Usage
 
 ```bash
-# Use a launch script by name (looks in profiles/ directory)
+# Use a launch script by name (looks in examples/ directory)
 ./launch-cluster.sh --launch-script example-vllm-minimax
 
 # Use a launch script by filename
