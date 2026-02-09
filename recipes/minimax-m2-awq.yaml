@@ -11,6 +11,9 @@ model: QuantTrio/MiniMax-M2-AWQ
 # Container image to use
 container: vllm-node
 
+# Can only be run in a cluster
+cluster_only: true
+
 # No mods required
 mods: []
 
