@@ -22,6 +22,7 @@ EXP_MXFP4=false
 TRITON_REF_SET=false
 VLLM_REF_SET=false
 VLLM_PRS=""
+FULL_LOG=false
 
 cleanup() {
     if [ -n "$TMP_IMAGE" ] && [ -f "$TMP_IMAGE" ]; then
@@ -81,6 +82,7 @@ usage() {
     echo "  --pre-tf, --pre-transformers : Install transformers 5.0.0rc0 or higher"
     echo "  --exp-mxfp4, --experimental-mxfp4 : Build with experimental native MXFP4 support"
     echo "  --apply-vllm-pr <pr-num>  : Apply a specific PR patch to vLLM source code. Can be specified multiple times."
+    echo "  --full-log                : Enable full build logging (--progress=plain)"
     echo "  --no-build                : Skip building, only copy image (requires --copy-to)"
     echo "  -h, --help                : Show this help message"
     exit 1
@@ -158,6 +160,7 @@ while [[ "$#" -gt 0 ]]; do
                exit 1
             fi
             ;;
+        --full-log) FULL_LOG=true ;;
         --no-build) NO_BUILD=true ;;
         -h|--help) usage ;;
         *) echo "Unknown parameter passed: $1"; usage ;;
@@ -197,6 +200,10 @@ BUILD_TIME=0
 if [ "$NO_BUILD" = false ]; then
     # Construct build command
     CMD=("docker" "build" "-t" "$IMAGE_TAG")
+
+    if [ "$FULL_LOG" = true ]; then
+        CMD+=("--progress=plain")
+    fi
 
     if [ "$EXP_MXFP4" = true ]; then
         echo "Building with experimental MXFP4 support..."

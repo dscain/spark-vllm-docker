@@ -135,20 +135,27 @@ RUN --mount=type=cache,id=repo-cache,target=/repo-cache \
 
 WORKDIR /workspace/flashinfer
 
+# Apply patch to avoid re-downloading existing cubins
+COPY flashinfer_cache.patch .
+RUN patch -p1 < flashinfer_cache.patch
+
 # flashinfer-python
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=cubins-cache,target=/workspace/flashinfer/flashinfer-cubin/flashinfer_cubin/cubins \
     sed -i -e 's/license = "Apache-2.0"/license = { text = "Apache-2.0" }/' -e '/license-files/d' pyproject.toml && \
     uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
 
 # flashinfer-cubin
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=cubins-cache,target=/workspace/flashinfer/flashinfer-cubin/flashinfer_cubin/cubins \
     cd flashinfer-cubin && uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
 
 # flashinfer-jit-cache
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=cubins-cache,target=/workspace/flashinfer/flashinfer-cubin/flashinfer_cubin/cubins \
     cd flashinfer-jit-cache && \
     uv build --no-build-isolation --wheel . --out-dir=/workspace/wheels -v
 
@@ -301,7 +308,7 @@ RUN chmod +x $VLLM_BASE_DIR/run-cluster-node.sh
 
 # Final extra deps
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv pip install ray[default] fastsafetensors
+    uv pip install ray[default] fastsafetensors nvidia-nvshmem-cu13
 
 # Cleanup
 
