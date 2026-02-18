@@ -202,10 +202,16 @@ if [ "$NO_BUILD" = false ]; then
         if [ "$REBUILD_FLASHINFER" = true ] || [ "$FLASHINFER_WHEELS_EXIST" = false ]; then
             if [ "$REBUILD_FLASHINFER" = true ]; then
                 echo "Rebuilding FlashInfer wheels (--rebuild-flashinfer specified)..."
-                rm -f ./wheels/flashinfer*.whl
             else
                 echo "No FlashInfer wheels found in ./wheels/ — building..."
             fi
+
+            # Back up existing flashinfer wheels; restore them if the build fails
+            FI_BACKUP="./wheels/.backup-flashinfer"
+            rm -rf "$FI_BACKUP" && mkdir -p "$FI_BACKUP"
+            for f in ./wheels/flashinfer*.whl; do
+                [ -f "$f" ] && mv "$f" "$FI_BACKUP/"
+            done
 
             FI_CMD=("docker" "build"
                 "--target" "flashinfer-export"
@@ -220,9 +226,16 @@ if [ "$NO_BUILD" = false ]; then
 
             echo "FlashInfer build command: ${FI_CMD[*]}"
             FI_START=$(date +%s)
-            "${FI_CMD[@]}"
-            FI_END=$(date +%s)
-            FLASHINFER_BUILD_TIME=$((FI_END - FI_START))
+            if "${FI_CMD[@]}"; then
+                FI_END=$(date +%s)
+                FLASHINFER_BUILD_TIME=$((FI_END - FI_START))
+                rm -rf "$FI_BACKUP"
+            else
+                echo "FlashInfer build failed — restoring previous wheels..."
+                mv "$FI_BACKUP"/flashinfer*.whl ./wheels/ 2>/dev/null || true
+                rm -rf "$FI_BACKUP"
+                exit 1
+            fi
         else
             echo "FlashInfer wheels already present in ./wheels/ — skipping build."
         fi
@@ -238,10 +251,16 @@ if [ "$NO_BUILD" = false ]; then
         if [ "$REBUILD_VLLM" = true ] || [ "$VLLM_WHEELS_EXIST" = false ]; then
             if [ "$REBUILD_VLLM" = true ]; then
                 echo "Rebuilding vLLM wheels (--rebuild-vllm specified)..."
-                rm -f ./wheels/vllm*.whl
             else
                 echo "No vLLM wheels found in ./wheels/ — building..."
             fi
+
+            # Back up existing vllm wheels; restore them if the build fails
+            VLLM_BACKUP="./wheels/.backup-vllm"
+            rm -rf "$VLLM_BACKUP" && mkdir -p "$VLLM_BACKUP"
+            for f in ./wheels/vllm*.whl; do
+                [ -f "$f" ] && mv "$f" "$VLLM_BACKUP/"
+            done
 
             VLLM_CMD=("docker" "build"
                 "--target" "vllm-export"
@@ -267,9 +286,16 @@ if [ "$NO_BUILD" = false ]; then
 
             echo "vLLM build command: ${VLLM_CMD[*]}"
             VLLM_START=$(date +%s)
-            "${VLLM_CMD[@]}"
-            VLLM_END=$(date +%s)
-            VLLM_BUILD_TIME=$((VLLM_END - VLLM_START))
+            if "${VLLM_CMD[@]}"; then
+                VLLM_END=$(date +%s)
+                VLLM_BUILD_TIME=$((VLLM_END - VLLM_START))
+                rm -rf "$VLLM_BACKUP"
+            else
+                echo "vLLM build failed — restoring previous wheels..."
+                mv "$VLLM_BACKUP"/vllm*.whl ./wheels/ 2>/dev/null || true
+                rm -rf "$VLLM_BACKUP"
+                exit 1
+            fi
         else
             echo "vLLM wheels already present in ./wheels/ — skipping build."
         fi
