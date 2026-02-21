@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# run-recipe.sh - Wrapper for run-recipe.py
+# run-benchmark.sh - Wrapper for run_benchmark.py
 #
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RECIPE_SCRIPT="$SCRIPT_DIR/run-recipe.py"
+BENCHMARK_SCRIPT="$SCRIPT_DIR/run_benchmark.py"
 
 # Check for Python 3.10+
 if command -v python3 &>/dev/null; then
@@ -23,4 +23,4 @@ if [[ "$PY_MAJOR" -lt 3 ]] || [[ "$PY_MAJOR" -eq 3 && "$PY_MINOR" -lt 10 ]]; the
     exit 1
 fi
 
-exec $PYTHON "$RECIPE_SCRIPT" "$@"
+exec $PYTHON "$BENCHMARK_SCRIPT" "$@"
