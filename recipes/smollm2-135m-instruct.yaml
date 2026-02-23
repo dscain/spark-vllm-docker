@@ -3,7 +3,7 @@
 # but using an extremely small model for fast validation.
 
 recipe_version: "1"
-name: OpenAI GPT-OSS Tiny
+name: SmolLM2 135M Instruct
 description: vLLM serving HuggingFaceTB/SmolLM2-135M-Instruct for very fast smoke testing
 
 # HuggingFace model to download (optional, for --download-model)
@@ -41,7 +41,7 @@ benchmark:
     pp: [128]
     depth: [0, 128, 256]
     enable_prefix_caching: true
-    save_result: test.md
+    save_result: benchmark_SmolLM2-135M-Instruct.csv
 
 # The vLLM serve command template
 command: |
