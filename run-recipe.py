@@ -843,6 +843,12 @@ Examples:
     override_group.add_argument("--tensor-parallel", "--tp", type=int, dest="tensor_parallel", help="Override tensor parallelism")
     override_group.add_argument("--gpu-memory-utilization", "--gpu-mem", type=float, dest="gpu_memory_utilization", help="Override GPU memory utilization")
     override_group.add_argument("--max-model-len", type=int, dest="max_model_len", help="Override max model length")
+    override_group.add_argument(
+        "--benchmark",
+        type=str.lower,
+        choices=["true", "false"],
+        help="Override recipe benchmark enablement (true/false)"
+    )
     
     # Launch options (passed to launch-cluster.sh)
     launch_group = parser.add_argument_group("Launch options (passed to launch-cluster.sh)")
@@ -1131,6 +1137,11 @@ Examples:
     script_content = generate_launch_script(recipe, overrides, is_solo=is_solo, extra_args=extra_args)
 
     benchmark_enabled = recipe["benchmark"]["enabled"]
+    if args.benchmark is not None:
+        benchmark_enabled = args.benchmark == "true"
+    # Keep recipe config in sync so downstream benchmark helpers
+    # (e.g., run_benchmark.run_recipe_benchmark) honor CLI override.
+    recipe["benchmark"]["enabled"] = benchmark_enabled
 
     if benchmark_enabled and not args.daemon and not args.dry_run:
         print("Error: Benchmark is enabled for this recipe, but launch is not in daemon mode.")
