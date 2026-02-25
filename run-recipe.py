@@ -69,7 +69,7 @@ RECIPE YAML SCHEMA:
     build_args: list[str]  # Optional: Args for build-and-copy.sh
     cluster_only: bool     # Optional: Require cluster mode (default: false)
     solo_only: bool        # Optional: Require solo mode (default: false)
-    benchmark: dict        # Optional: Benchmark configuration (only runs via --benchmark true)
+    benchmark: dict        # Optional: Benchmark configuration (only runs via --benchmark)
 
 RECIPE VERSION HISTORY:
     Version 1 (default): Initial schema with all fields above supported.
@@ -143,7 +143,7 @@ def load_recipe(recipe_path: Path) -> dict[str, Any]:
         benchmark (dict, optional): Benchmark configuration
             framework (str): Benchmark framework (default: 'llama-benchy')
             args (dict): Framework-specific args consumed by run_benchmark.py
-            NOTE: Benchmarks are only executed when CLI flag --benchmark true is provided
+            NOTE: Benchmarks are only executed when CLI flag --benchmark is provided
     
     Args:
         recipe_path: Path object pointing to YAML file or just recipe name
@@ -841,9 +841,8 @@ Examples:
     override_group.add_argument("--max-model-len", type=int, dest="max_model_len", help="Override max model length")
     override_group.add_argument(
         "--benchmark",
-        type=str.lower,
-        choices=["true", "false"],
-        help="Run benchmark after successful launch (explicit opt-in only)"
+        action="store_true",
+        help="Run benchmark after successful launch"
     )
     
     # Launch options (passed to launch-cluster.sh)
@@ -1132,11 +1131,11 @@ Examples:
     # Generate launch script
     script_content = generate_launch_script(recipe, overrides, is_solo=is_solo, extra_args=extra_args)
 
-    benchmark_requested = args.benchmark == "true"
+    benchmark_requested = args.benchmark
 
     if benchmark_requested and not args.daemon and not args.dry_run:
         print("Error: Benchmark was requested, but launch is not in daemon mode.")
-        print("Use -d/--daemon with --benchmark true so vLLM stays running during benchmark.")
+        print("Use -d/--daemon with --benchmark so vLLM stays running during benchmark.")
         return 1
     
     if args.dry_run:

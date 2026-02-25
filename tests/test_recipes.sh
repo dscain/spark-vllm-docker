@@ -1177,9 +1177,9 @@ test_extra_args_cluster_mode() {
 # Benchmark Integration Tests
 # ==============================================================================
 
-# Test: benchmark block is ignored by default when not enabled
+# Test: benchmark block is ignored by default when --benchmark is not provided
 test_benchmark_default_disabled() {
-    log_test "Benchmark: default disabled when benchmark block is absent"
+    log_test "Benchmark: default disabled when --benchmark is not provided"
 
     temp_recipe=$(mktemp)
     cat > "$temp_recipe" << 'EOF'
@@ -1207,7 +1207,7 @@ EOF
 
 # Test: benchmark enabled generates expected command
 test_benchmark_enabled_dry_run() {
-    log_test "Benchmark: enabled recipe prints benchmark command"
+    log_test "Benchmark: --benchmark prints benchmark command"
 
     temp_recipe=$(mktemp)
     cat > "$temp_recipe" << 'EOF'
@@ -1238,7 +1238,7 @@ echo "fake llama-benchy"
 EOF
     chmod +x "$fake_benchy_dir/llama-benchy"
 
-    output=$(PATH="$fake_benchy_dir:$PATH" "$PROJECT_DIR/run-recipe.py" "$temp_recipe" --dry-run --solo 2>&1)
+    output=$(PATH="$fake_benchy_dir:$PATH" "$PROJECT_DIR/run-recipe.py" "$temp_recipe" --dry-run --solo --benchmark 2>&1)
     rm -f "$temp_recipe"
     rm -rf "$fake_benchy_dir"
 
@@ -1285,7 +1285,7 @@ echo "fake llama-benchy"
 EOF
     chmod +x "$fake_benchy_dir/llama-benchy"
 
-    output=$(PATH="$fake_benchy_dir:$PATH" "$PROJECT_DIR/run-recipe.py" "$temp_recipe" --dry-run --solo 2>&1)
+    output=$(PATH="$fake_benchy_dir:$PATH" "$PROJECT_DIR/run-recipe.py" "$temp_recipe" --dry-run --solo --benchmark 2>&1)
     rm -f "$temp_recipe"
     rm -rf "$fake_benchy_dir"
 
@@ -1299,9 +1299,9 @@ EOF
     fi
 }
 
-# Test: benchmark enabled validation requires llama-benchy in PATH
+# Test: requesting benchmark requires llama-benchy in PATH
 test_benchmark_requires_benchy_installed() {
-    log_test "Benchmark: enabled recipe requires llama-benchy in PATH"
+    log_test "Benchmark: --benchmark requires llama-benchy in PATH"
 
     temp_recipe=$(mktemp)
     cat > "$temp_recipe" << 'EOF'
@@ -1320,10 +1320,11 @@ benchmark:
 EOF
 
     pybin=$(command -v python3)
-    output=$(PATH="/nonexistent" "$pybin" "$PROJECT_DIR/run-recipe.py" "$temp_recipe" --dry-run --solo 2>&1 || true)
+    output=$(PATH="/nonexistent" "$pybin" "$PROJECT_DIR/run_benchmark.py" "$temp_recipe" --dry-run --benchmark 2>&1 || true)
     rm -f "$temp_recipe"
 
-    if echo "$output" | grep -q "requires 'llama-benchy' in PATH"; then
+    if echo "$output" | grep -q "'llama-benchy' not found in PATH" || \
+       echo "$output" | grep -q "requires 'llama-benchy' in PATH"; then
         log_pass "Benchmark: missing llama-benchy is caught during recipe validation"
     else
         log_fail "Benchmark: missing llama-benchy was not reported"

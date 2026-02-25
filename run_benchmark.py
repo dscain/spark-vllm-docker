@@ -177,8 +177,8 @@ def run_recipe_benchmark(recipe: dict, dry_run: bool = False, benchmark_requeste
     validate_recipe_benchmark_config(recipe)
     benchmark = recipe["benchmark"]
     if not benchmark_requested:
-        print("Error: Benchmark execution requires explicit opt-in: pass --benchmark true")
-        return 1
+        print("Benchmark execution not requested (pass --benchmark to run).")
+        return 0
 
     if benchmark["framework"] == "llama-benchy" and shutil.which("llama-benchy") is None:
         print("Error: 'llama-benchy' not found in PATH.")
@@ -217,9 +217,8 @@ def main() -> int:
     parser.add_argument("recipe", help="Recipe YAML path or recipe name")
     parser.add_argument(
         "--benchmark",
-        type=str.lower,
-        choices=["true", "false"],
-        help="Run benchmark (required explicit opt-in)",
+        action="store_true",
+        help="Run benchmark",
     )
     parser.add_argument("--save-result", help="Override benchmark output file path")
     parser.add_argument("--dry-run", action="store_true", help="Print benchmark command without executing")
@@ -232,13 +231,10 @@ def main() -> int:
 
     validate_recipe_benchmark_config(recipe)
 
-    benchmark_requested = args.benchmark == "true"
-    if args.benchmark == "false":
-        print("Benchmark execution disabled via --benchmark false")
-        return 0
+    benchmark_requested = args.benchmark
     if not benchmark_requested:
-        print("Error: Benchmark execution requires explicit opt-in: pass --benchmark true")
-        return 1
+        print("Benchmark execution not requested (pass --benchmark to run).")
+        return 0
 
     if args.save_result:
         recipe.setdefault("benchmark", {}).setdefault("args", {})["save_result"] = args.save_result
