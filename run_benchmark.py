@@ -32,7 +32,6 @@ SUPPORTED_BENCHMARK_FRAMEWORKS = {"llama-benchy"}
 def validate_recipe_benchmark_config(recipe: dict) -> None:
     """Validate and normalize benchmark config in a recipe."""
     benchmark = recipe.setdefault("benchmark", {})
-    benchmark.setdefault("enabled", False)
     benchmark.setdefault("framework", "llama-benchy")
     benchmark.setdefault("args", {})
 
@@ -41,14 +40,6 @@ def validate_recipe_benchmark_config(recipe: dict) -> None:
             f"Unsupported benchmark framework in recipe: {benchmark['framework']}\n"
             f"Supported frameworks: {', '.join(sorted(SUPPORTED_BENCHMARK_FRAMEWORKS))}"
         )
-
-    if benchmark.get("enabled", False):
-        if benchmark["framework"] == "llama-benchy" and shutil.which("llama-benchy") is None:
-            raise ValueError(
-                "benchmark.enabled=true requires 'llama-benchy' in PATH.\n"
-                "Install with: uv pip install -U llama-benchy"
-            )
-
 
 def resolve_recipe_path(recipe_arg: str) -> Path:
     recipe_path = Path(recipe_arg)
@@ -181,12 +172,17 @@ def wait_for_models_endpoint_and_get_first_model(
     return None
 
 
-def run_recipe_benchmark(recipe: dict, dry_run: bool = False) -> int:
+def run_recipe_benchmark(recipe: dict, dry_run: bool = False, benchmark_requested: bool = False) -> int:
     """Run benchmark for a loaded recipe, including readiness checks."""
     validate_recipe_benchmark_config(recipe)
     benchmark = recipe["benchmark"]
-    if not benchmark["enabled"]:
-        print("Error: benchmark.enabled is false (or benchmark block is missing) in recipe")
+    if not benchmark_requested:
+        print("Error: Benchmark execution requires explicit opt-in: pass --benchmark true")
+        return 1
+
+    if benchmark["framework"] == "llama-benchy" and shutil.which("llama-benchy") is None:
+        print("Error: 'llama-benchy' not found in PATH.")
+        print("Install with: uv pip install -U llama-benchy")
         return 1
 
     if dry_run:
@@ -219,6 +215,12 @@ def run_recipe_benchmark(recipe: dict, dry_run: bool = False) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run model benchmark frameworks")
     parser.add_argument("recipe", help="Recipe YAML path or recipe name")
+    parser.add_argument(
+        "--benchmark",
+        type=str.lower,
+        choices=["true", "false"],
+        help="Run benchmark (required explicit opt-in)",
+    )
     parser.add_argument("--save-result", help="Override benchmark output file path")
     parser.add_argument("--dry-run", action="store_true", help="Print benchmark command without executing")
     args = parser.parse_args()
@@ -230,15 +232,18 @@ def main() -> int:
 
     validate_recipe_benchmark_config(recipe)
 
-    benchmark = recipe["benchmark"]
-    if not benchmark["enabled"]:
-        print("Error: benchmark.enabled is false (or benchmark block is missing) in recipe")
+    benchmark_requested = args.benchmark == "true"
+    if args.benchmark == "false":
+        print("Benchmark execution disabled via --benchmark false")
+        return 0
+    if not benchmark_requested:
+        print("Error: Benchmark execution requires explicit opt-in: pass --benchmark true")
         return 1
 
     if args.save_result:
         recipe.setdefault("benchmark", {}).setdefault("args", {})["save_result"] = args.save_result
 
-    return run_recipe_benchmark(recipe, dry_run=args.dry_run)
+    return run_recipe_benchmark(recipe, dry_run=args.dry_run, benchmark_requested=benchmark_requested)
 
 
 if __name__ == "__main__":

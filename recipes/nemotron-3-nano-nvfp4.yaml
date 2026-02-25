@@ -34,13 +34,13 @@ env:
 
 # Optional benchmarking (run after successful launch)
 benchmark:
-  enabled: false
   framework: llama-benchy
   args:
     pp: [2048]
     depth: [0, 4096, 8192, 16384, 32768, 65535, 100000]
     enable_prefix_caching: true
     save_result: benchmark_NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4.csv
+    format: csv
 
 # The vLLM serve command template
 command: |

@@ -69,7 +69,7 @@ RECIPE YAML SCHEMA:
     build_args: list[str]  # Optional: Args for build-and-copy.sh
     cluster_only: bool     # Optional: Require cluster mode (default: false)
     solo_only: bool        # Optional: Require solo mode (default: false)
-    benchmark: dict        # Optional: Benchmark configuration
+    benchmark: dict        # Optional: Benchmark configuration (only runs via --benchmark true)
 
 RECIPE VERSION HISTORY:
     Version 1 (default): Initial schema with all fields above supported.
@@ -141,9 +141,9 @@ def load_recipe(recipe_path: Path) -> dict[str, Any]:
         cluster_only (bool, optional): If True, recipe cannot run in solo mode
         solo_only (bool, optional): If True, recipe cannot run in cluster mode
         benchmark (dict, optional): Benchmark configuration
-            enabled (bool): Run benchmark after successful launch (default: False)
             framework (str): Benchmark framework (default: 'llama-benchy')
             args (dict): Framework-specific args consumed by run_benchmark.py
+            NOTE: Benchmarks are only executed when CLI flag --benchmark true is provided
     
     Args:
         recipe_path: Path object pointing to YAML file or just recipe name
@@ -240,7 +240,6 @@ def list_recipes() -> None:
             cluster_only = recipe.get("cluster_only", False)
             solo_only = recipe.get("solo_only", False)
             benchmark_cfg = recipe.get("benchmark", {})
-            benchmark_enabled = benchmark_cfg.get("enabled", False)
             
             print(f"  {recipe_path.name}")
             print(f"    Name: {name}")
@@ -257,10 +256,7 @@ def list_recipes() -> None:
                 print(f"    Build args: {' '.join(build_args)}")
             if mods:
                 print(f"    Mods: {', '.join(mods)}")
-            if benchmark_enabled:
-                print(f"    Benchmark: {benchmark_cfg.get('framework', 'llama-benchy')}")
-            else:
-                print("    Benchmark: disabled")
+            print(f"    Benchmark: {benchmark_cfg.get('framework', 'llama-benchy')}")
             print()
         except Exception as e:
             print(f"  {recipe_path.name} (error loading: {e})")
@@ -847,7 +843,7 @@ Examples:
         "--benchmark",
         type=str.lower,
         choices=["true", "false"],
-        help="Override recipe benchmark enablement (true/false)"
+        help="Run benchmark after successful launch (explicit opt-in only)"
     )
     
     # Launch options (passed to launch-cluster.sh)
@@ -1136,16 +1132,11 @@ Examples:
     # Generate launch script
     script_content = generate_launch_script(recipe, overrides, is_solo=is_solo, extra_args=extra_args)
 
-    benchmark_enabled = recipe["benchmark"]["enabled"]
-    if args.benchmark is not None:
-        benchmark_enabled = args.benchmark == "true"
-    # Keep recipe config in sync so downstream benchmark helpers
-    # (e.g., run_benchmark.run_recipe_benchmark) honor CLI override.
-    recipe["benchmark"]["enabled"] = benchmark_enabled
+    benchmark_requested = args.benchmark == "true"
 
-    if benchmark_enabled and not args.daemon and not args.dry_run:
-        print("Error: Benchmark is enabled for this recipe, but launch is not in daemon mode.")
-        print("Use -d/--daemon so vLLM stays running and benchmark can execute automatically.")
+    if benchmark_requested and not args.daemon and not args.dry_run:
+        print("Error: Benchmark was requested, but launch is not in daemon mode.")
+        print("Use -d/--daemon with --benchmark true so vLLM stays running during benchmark.")
         return 1
     
     if args.dry_run:
@@ -1173,7 +1164,7 @@ Examples:
         print(" ".join(cmd_parts))
         print()
         print("3. The launch script runs inside the container")
-        if benchmark_enabled:
+        if benchmark_requested:
             benchmark_cmd = run_benchmark.build_llama_benchy_command(recipe)
             print(f"\n4. Benchmark command after launch:\n   {shlex.join(benchmark_cmd)}")
             print("\n5. After benchmark completes, stop the launched vLLM cluster/container.")
@@ -1234,8 +1225,12 @@ Examples:
         if result.returncode != 0:
             return result.returncode
 
-        if benchmark_enabled:
-            benchmark_rc = run_benchmark.run_recipe_benchmark(recipe, dry_run=False)
+        if benchmark_requested:
+            benchmark_rc = run_benchmark.run_recipe_benchmark(
+                recipe,
+                dry_run=False,
+                benchmark_requested=True,
+            )
             stop_rc = stop_cluster_after_benchmark(container, nodes, is_solo)
             if stop_rc != 0:
                 print(f"Warning: Failed to stop cluster cleanly (exit code {stop_rc}).")

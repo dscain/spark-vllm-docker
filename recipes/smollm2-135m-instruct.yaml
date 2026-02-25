@@ -34,7 +34,6 @@ env: {}
 
 # Optional benchmarking (run after successful launch)
 benchmark:
-  enabled: true
   framework: llama-benchy
   model: HuggingFaceTB/SmolLM2-135M-Instruct
   args:
@@ -42,6 +41,7 @@ benchmark:
     depth: [0, 128, 256]
     enable_prefix_caching: true
     save_result: benchmark_SmolLM2-135M-Instruct.csv
+    format: csv
 
 # The vLLM serve command template
 command: |
