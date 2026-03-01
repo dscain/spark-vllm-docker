@@ -125,7 +125,7 @@ def build_llama_benchy_command(recipe: dict, model: str = "__from_v1_models__") 
 
 
 def wait_for_models_endpoint_and_get_first_model(
-    base_url: str, timeout_seconds: int = 300, interval_seconds: int = 2
+    base_url: str, timeout_seconds: int = 60*10, interval_seconds: int = 2
 ) -> str | None:
     """Wait for GET /v1/models, print payload, and return first model id when available."""
     models_url = f"{base_url.rstrip('/')}/models"
