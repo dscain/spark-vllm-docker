@@ -1231,12 +1231,13 @@ Examples:
         no_ray=getattr(args, "no_ray", False),
     )
 
-    benchmark_enabled = recipe["benchmark"]["enabled"]
+    benchmark_cfg = recipe.setdefault("benchmark", {})
+    benchmark_enabled = benchmark_cfg.get("enabled", False)
     if args.benchmark is not None:
         benchmark_enabled = args.benchmark == "true"
     # Keep recipe config in sync so downstream benchmark helpers
     # (e.g., run_benchmark.run_recipe_benchmark) honor CLI override.
-    recipe["benchmark"]["enabled"] = benchmark_enabled
+    benchmark_cfg["enabled"] = benchmark_enabled
 
     if benchmark_enabled and not args.daemon and not args.dry_run:
         print("Error: Benchmark is enabled for this recipe, but launch is not in daemon mode.")
